@@ -23,3 +23,6 @@ __pycache__/
 *.pdf
 *.jpg
 !diagrams/*.png
+
+# Archivos pesados
+data/raw/*.csv
