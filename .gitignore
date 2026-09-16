@@ -1,0 +1,25 @@
+# Entorno virtual
+venv/
+env/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Variables de entorno / credenciales
+.env
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Sistema
+.DS_Store
+
+# Datos crudos pesados (descomentar si no quieren subirlos al repo)
+# data/raw/*.csv
+
+# Salidas de análisis
+*.pdf
+*.jpg
+!diagrams/*.png
