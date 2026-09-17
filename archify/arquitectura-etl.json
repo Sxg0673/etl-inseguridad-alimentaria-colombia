@@ -1,0 +1,42 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Arquitectura de alto nivel — ETL de inseguridad alimentaria en Colombia",
+    "output": "arquitectura-etl-inseguridad-alimentaria.html",
+    "quality_profile": "showcase",
+    "repository": {
+      "url": "https://github.com/Sxg0673/etl-inseguridad-alimentaria-colombia.git",
+      "provider": "github",
+      "revision": "ff8d6c8f365b0b748ff6056e351edfb674874270"
+    }
+  },
+  "components": [
+    { "id": "fuentes", "type": "external", "label": "Portal DANE", "sublabel": "Microdatos ECV 2025", "pos": [35, 300], "size": [145, 64], "sources": [{ "path": "data/raw/README.md", "line": 5, "end_line": 21, "label": "origen y descarga" }] },
+    { "id": "raw", "type": "cloud", "label": "Datos crudos", "sublabel": "3 CSV en data/raw", "pos": [235, 300], "size": [140, 64], "sources": [{ "path": "src/extract.py", "line": 10, "end_line": 12, "label": "rutas de entrada" }] },
+    { "id": "referencias", "type": "external", "label": "Referencia local", "sublabel": "DIVIPOLA y diccionario", "pos": [842, 125], "size": [140, 64], "sources": [{ "path": "notebooks/hallazgos_perfilamiento.md", "line": 46, "end_line": 47, "label": "cruce DIVIPOLA" }] },
+    { "id": "profiling", "type": "backend", "label": "Perfilamiento", "sublabel": "Notebook de hallazgos", "pos": [435, 470], "size": [150, 64], "sources": [{ "path": "notebooks/hallazgos_perfilamiento.md", "line": 1, "end_line": 8, "label": "evidencia técnica" }] },
+    { "id": "extract", "type": "backend", "label": "Extracción", "sublabel": "pandas · extract.py", "pos": [435, 300], "size": [150, 64], "sources": [{ "path": "src/extract.py", "line": 17, "end_line": 36, "label": "lectura CSV" }] },
+    { "id": "clean", "type": "backend", "label": "Limpieza", "sublabel": "pandas · clean.py", "pos": [635, 300], "size": [150, 64], "sources": [{ "path": "src/clean.py", "line": 23, "end_line": 57, "label": "reglas implementadas" }] },
+    { "id": "transform", "type": "backend", "label": "Transformación", "sublabel": "Módulo previsto (vacío)", "pos": [835, 300], "size": [155, 64], "tag": "pendiente" },
+    { "id": "load", "type": "database", "label": "Carga y analítica", "sublabel": "Módulos/SQL previstos (vacíos)", "pos": [1040, 300], "size": [180, 64], "tag": "pendiente" }
+  ],
+  "boundaries": [
+    { "kind": "region", "label": "Repositorio / entorno ETL bajo propiedad del equipo", "wraps": ["raw", "referencias", "profiling", "extract", "clean", "transform", "load"] },
+    { "kind": "security-group", "label": "Implementación actual en Python", "wraps": ["extract", "clean"] }
+  ],
+  "connections": [
+    { "id": "source-ingest", "from": "fuentes", "to": "raw", "label": "entrega de archivos", "labelDy": 56, "variant": "emphasis" },
+    { "id": "raw-extract", "from": "raw", "to": "extract", "label": "lectura de insumos", "labelDy": 56, "variant": "emphasis" },
+    { "id": "raw-profiling", "from": "raw", "to": "profiling", "fromSide": "bottom", "toSide": "top", "variant": "dashed" },
+    { "id": "reference-transform", "from": "referencias", "to": "transform", "label": "códigos territoriales", "fromSide": "bottom", "toSide": "top", "variant": "dashed" },
+    { "id": "extract-clean", "from": "extract", "to": "clean", "label": "dataframes extraídos", "labelDy": 56, "variant": "emphasis" },
+    { "id": "clean-transform", "from": "clean", "to": "transform", "label": "extensión prevista", "labelDy": 56, "variant": "dashed" },
+    { "id": "transform-load", "from": "transform", "to": "load", "label": "extensión prevista", "labelDy": 56, "variant": "dashed" }
+  ],
+  "cards": [
+    { "dot": "cyan", "title": "Ruta principal", "items": ["Portal DANE → data/raw → extract.py → clean.py", "Los tramos punteados describen la arquitectura prevista, no código ejecutable actual"] },
+    { "dot": "violet", "title": "Apoyos", "items": ["El perfilamiento fija los parámetros de lectura y las decisiones de limpieza", "DIVIPOLA se documenta como insumo para un cruce territorial posterior"] },
+    { "dot": "rose", "title": "Límite de propiedad / confianza", "items": ["El portal DANE es externo; los archivos entran al perímetro mediante data/raw", "Solo extracción y limpieza tienen implementación: transform.py, load.py, validate.py, analytics.py y los SQL están vacíos"] }
+  ]
+}
