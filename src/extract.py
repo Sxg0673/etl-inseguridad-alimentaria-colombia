@@ -1,17 +1,27 @@
 """
-Modulo de extraccion de datos.
+Modulo de extraccion de datos crudos.
 
-1. Lee los archivos CSV descargados del portal DANE, con los parametros de separador, codificacion y tipo de datos validados durante el perfilamiento.
+Responsabilidad unica: leer los archivos fuente de la ECV 2025 sin aplicar
+ninguna transformacion, limpieza o regla de negocio. Los datos se devuelven
+exactamente como vienen en el archivo original, con todas las columnas
+como texto para no perder ceros a la izquierda en los codigos.
 """
 
+from pathlib import Path
+
 import pandas as pd
+
+# Raiz del proyecto, calculada desde la ubicacion de este archivo. Esto
+# hace que las rutas funcionen sin importar desde donde se ejecute el
+# codigo (notebook, main.py, o cualquier otro punto de entrada).
+RAIZ_PROYECTO = Path(__file__).resolve().parent.parent
 
 # Rutas de los archivos fuente. Los nombres incluyen espacios porque asi
 # se descargan del portal DANE, y se dejan intactos para mantener trazabilidad
 # directa con la fuente.
-RUTA_VIVIENDA = 'data/raw/Datos de la vivienda.csv'
-RUTA_SERVICIOS_HOGAR = 'data/raw/Servicios del hogar.csv'
-RUTA_CONDICIONES_VIDA = 'data/raw/Condiciones de vida del hogar y tenencia de bienes.csv'
+RUTA_VIVIENDA = RAIZ_PROYECTO / 'data' / 'raw' / 'Datos de la vivienda.csv'
+RUTA_SERVICIOS_HOGAR = RAIZ_PROYECTO / 'data' / 'raw' / 'Servicios del hogar.csv'
+RUTA_CONDICIONES_VIDA = RAIZ_PROYECTO / 'data' / 'raw' / 'Condiciones de vida del hogar y tenencia de bienes.csv'
 
 
 def leer_csv_crudo(ruta):

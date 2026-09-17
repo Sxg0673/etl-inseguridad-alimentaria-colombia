@@ -1,0 +1,52 @@
+{
+  "version": "3.0.0",
+  "darkMode": true,
+  "gridEnabling": false,
+  "currentViewName": null,
+  "defaultView": {
+    "detailLevel": "All",
+    "relationshipMode": "All",
+    "tablePositions": [
+      {
+        "name": "fact_seguridad_alimentaria_hogar",
+        "schemaName": "public",
+        "x": 678.30419921875,
+        "y": 12
+      },
+      {
+        "name": "dim_geografia",
+        "schemaName": "public",
+        "x": 200.04833836857995,
+        "y": 44
+      },
+      {
+        "name": "dim_nivel_ingreso",
+        "schemaName": "public",
+        "x": 231.04531722054378,
+        "y": 326.39879154078545
+      },
+      {
+        "name": "dim_nivel_severidad_ia",
+        "schemaName": "public",
+        "x": 266.1752265861028,
+        "y": 481.8006042296071
+      },
+      {
+        "name": "dim_choque_economico",
+        "schemaName": "public",
+        "x": 1129.9577039274927,
+        "y": 12
+      },
+      {
+        "name": "dim_estrategia_afrontamiento",
+        "schemaName": "public",
+        "x": 1138.2235649546828,
+        "y": 384.26586102719045
+      }
+    ],
+    "tableGroupCollapseStates": [],
+    "stickyNoteLayouts": [],
+    "referencePaths": []
+  },
+  "views": {}
+}

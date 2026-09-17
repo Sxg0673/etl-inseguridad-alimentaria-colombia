@@ -1,0 +1,101 @@
+// =====================================================================
+// MODELO DIMENSIONAL - Inseguridad alimentaria en hogares colombianos
+// Fuente: Encuesta Nacional de Calidad de Vida (ECV) 2025 - DANE
+// Esquema: Estrella
+// Grano del hecho: un hogar encuestado en la ECV 2025
+// =====================================================================
+
+Table fact_seguridad_alimentaria_hogar {
+  id_hogar integer [pk, note: 'Llave subrogada del hecho']
+
+  id_geografia integer [ref: > dim_geografia.id_geografia]
+  id_nivel_ingreso integer [ref: > dim_nivel_ingreso.id_nivel_ingreso]
+  id_nivel_severidad_ia integer [ref: > dim_nivel_severidad_ia.id_nivel_severidad_ia]
+  id_choque_economico integer [ref: > dim_choque_economico.id_choque_economico]
+  id_estrategia_afrontamiento integer [ref: > dim_estrategia_afrontamiento.id_estrategia_afrontamiento]
+
+  tiene_acueducto boolean [note: 'R2 - P8520S5']
+  tiene_alcantarillado boolean [note: 'R2 - P8520S3']
+
+  factor_expansion decimal [note: 'FEX_C - pondera a poblacion nacional']
+  prob_ia_moderada_grave decimal [note: 'PROB_IAMG - escala 0 a 100']
+  prob_ia_grave decimal [note: 'PROB_IAG - escala 0 a 100']
+
+  Note: 'Una fila = un hogar. 87.060 hogares. Las medidas de prevalencia se calculan siempre ponderadas por factor_expansion.'
+}
+
+// ---------------------------------------------------------------------
+// R1 - Distribucion territorial
+// Grano: una fila por combinacion departamento + clase (65 reales)
+// La region depende de departamento Y clase, no solo del departamento
+// (Bogota es region 5 en cabecera y region 2 en rural)
+// ---------------------------------------------------------------------
+Table dim_geografia {
+  id_geografia integer [pk, note: 'Llave subrogada']
+  codigo_departamento varchar [note: 'DIVIPOLA 2 digitos']
+  nombre_departamento varchar
+  codigo_region varchar
+  nombre_region varchar [note: 'Caribe, Oriental, Central, Pacifica, Bogota, Antioquia, Valle del Cauca, San Andres, Orinoquia-Amazonia']
+  codigo_clase varchar
+  nombre_clase varchar [note: 'Cabecera / Centros poblados y rural disperso']
+}
+
+// ---------------------------------------------------------------------
+// R5 - Nivel de ingreso
+// Grano: una fila por quintil de ingreso per capita (6 filas)
+// ---------------------------------------------------------------------
+Table dim_nivel_ingreso {
+  id_nivel_ingreso integer [pk, note: 'Llave subrogada']
+  codigo_quintil varchar
+  nombre_quintil varchar [note: 'Q1 (20% menor ingreso) a Q5 (20% mayor ingreso), mas categoria Dato inconsistente para los 3 hogares con PERCAPITA invalido']
+}
+
+// ---------------------------------------------------------------------
+// R4 - Nivel de severidad (cortes estandar FAO / DANE sobre escala FIES)
+// Grano: una fila por nivel de severidad (5 filas)
+// ---------------------------------------------------------------------
+Table dim_nivel_severidad_ia {
+  id_nivel_severidad_ia integer [pk, note: 'Llave subrogada']
+  nombre_severidad varchar [note: 'Seguridad alimentaria / Leve / Moderada / Grave / Sin dato']
+  puntaje_fies_minimo integer [note: '0 / 1 / 4 / 7']
+  puntaje_fies_maximo integer [note: '0 / 3 / 6 / 8']
+}
+
+// ---------------------------------------------------------------------
+// R3 - Choques economicos (junk dimension)
+// Grano: una fila por combinacion de choques realmente observada
+// 171 combinaciones reales + 1 fila para "sin ningun choque"
+// NOTA: se muestran solo algunas de las 11 banderas por legibilidad
+// ---------------------------------------------------------------------
+Table dim_choque_economico {
+  id_choque_economico integer [pk, note: 'Llave subrogada']
+  jefe_perdio_empleo boolean [note: 'P3202S1']
+  conyuge_perdio_empleo boolean [note: 'P3202S2']
+  otro_miembro_perdio_empleo boolean [note: 'P3202S3']
+  cierre_negocio boolean [note: 'P3202S4']
+  no_vendio_produccion boolean [note: 'P3202S5']
+  atraso_servicios_publicos boolean [note: 'P3202S10']
+  continua varchar [note: '... y 5 banderas mas: P3202S6 jardin/colegio, P3202S7 universidad, P3202S8 vivienda, P3202S9 administracion, P3202S11 impuestos']
+  numero_choques integer [note: 'Conteo de banderas activas en esta combinacion']
+
+  Note: '171 combinaciones reales observadas + 1 fila sin choque. Solo se pueblan combinaciones presentes en los datos, no el producto cartesiano.'
+}
+
+// ---------------------------------------------------------------------
+// R4 - Estrategias de afrontamiento (junk dimension)
+// Grano: una fila por combinacion de estrategias realmente observada
+// NOTA: se muestran solo algunas de las 14 banderas por legibilidad
+// ---------------------------------------------------------------------
+Table dim_estrategia_afrontamiento {
+  id_estrategia_afrontamiento integer [pk, note: 'Llave subrogada']
+  empezaron_a_trabajar boolean [note: 'P3203S1']
+  nuevas_fuentes_ingreso boolean [note: 'P3203S2']
+  gastaron_ahorros boolean [note: 'P3203S4']
+  se_endeudaron boolean [note: 'P3203S5']
+  disminuyeron_gasto_alimentos boolean [note: 'P3203S10 - se analiza aparte por su cercania conceptual con la variable dependiente']
+  ayuda_familiares_amigos boolean [note: 'P3203S12']
+  continua varchar [note: '... y 8 banderas mas: P3203S3 vivir con familiares, P3203S6 vender bienes, P3203S7 vender vivienda, P3203S8 retiro escolar, P3203S9 retiro universidad, P3203S11 ayuda gobierno, P3203S13 subsidio desempleo, P3203S14 otra']
+  numero_estrategias integer [note: 'Conteo de banderas activas en esta combinacion']
+
+  Note: 'Solo combinaciones realmente observadas. Condicionada a R3: los hogares sin choque tienen cero estrategias.'
+}
