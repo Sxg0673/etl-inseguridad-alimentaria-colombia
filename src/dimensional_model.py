@@ -189,8 +189,14 @@ def _construir_hecho(df, dim_geografia, dim_nivel_ingreso, dim_nivel_severidad_i
 
     hecho.insert(0, 'id_hogar', range(1, len(hecho) + 1))
 
+    # DIRECTORIO y ORDEN se renombran a minusculas aqui, para que el hecho
+    # completo respete una unica convencion de nomenclatura. No forman parte
+    # del diagrama del modelo, pero si se conservan en la base de datos como
+    # llave natural de trazabilidad hacia el archivo original del DANE.
+    hecho = hecho.rename(columns={'DIRECTORIO': 'directorio', 'ORDEN': 'orden'})
+
     columnas_finales = [
-        'id_hogar', 'DIRECTORIO', 'ORDEN',
+        'id_hogar', 'directorio', 'orden',
         'id_geografia', 'id_nivel_ingreso', 'id_nivel_severidad_ia',
         'id_choque_economico', 'id_estrategia_afrontamiento',
         'tiene_acueducto', 'tiene_alcantarillado',

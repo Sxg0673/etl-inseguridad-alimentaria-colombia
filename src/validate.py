@@ -51,8 +51,8 @@ def _validar_sin_fan_out(fact, df_transformado):
     if fact['id_hogar'].duplicated().any():
         raise ValueError('id_hogar tiene valores duplicados en el hecho.')
 
-    if fact.duplicated(subset=['DIRECTORIO', 'ORDEN']).any():
-        raise ValueError('La llave natural (DIRECTORIO, ORDEN) tiene duplicados en el hecho.')
+    if fact.duplicated(subset=['directorio', 'orden']).any():
+        raise ValueError('La llave natural (directorio, orden) tiene duplicados en el hecho.')
 
     print('OK - Sin fan-out: el hecho tiene', len(fact), 'filas, sin duplicados de llave.')
 

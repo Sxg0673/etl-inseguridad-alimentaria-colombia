@@ -1,10 +1,8 @@
 """
 Modulo de extraccion de datos crudos.
 
-Responsabilidad unica: leer los archivos fuente de la ECV 2025 sin aplicar
-ninguna transformacion, limpieza o regla de negocio. Los datos se devuelven
-exactamente como vienen en el archivo original, con todas las columnas
-como texto para no perder ceros a la izquierda en los codigos.
+1. Lee los archivos CSV de la ECV 2025 con los parametros validados durante el perfilamiento: separador punto y coma, todas las columnas como texto, y codificacion utf-8 con BOM.
+2. Devuelve un DataFrame por cada tabla, sin aplicar ninguna regla de negocio ni limpieza. 
 """
 
 from pathlib import Path
