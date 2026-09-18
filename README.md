@@ -49,10 +49,7 @@ El presente caso de estudio busca responder a la siguiente pregunta:
 
 | ODS | Relación con el proyecto | Contribución concreta |
 |---|---|---|
-| **ODS 2: Hambre Cero** | Es el objetivo principal, pues aborda la seguridad alimentaria, la nutrición y la identificación de hogares vulnerables. | Genera evidencia descriptiva sobre la prevalencia de inseguridad alimentaria y sus asociaciones con condiciones socioeconómicas. |
-| **ODS 1: Fin de la pobreza** | Los ingresos y los choques económicos son dimensiones relevantes de la vulnerabilidad del hogar. | Permite observar cómo los niveles de ingreso y las crisis económicas se relacionan con la inseguridad alimentaria. |
-| **ODS 10: Reducción de las desigualdades** | Las diferencias territoriales y de acceso a servicios pueden expresar brechas estructurales. | Facilita comparaciones entre regiones, departamentos y tipos de área para visibilizar desigualdades. |
-| **ODS 11: Ciudades y comunidades sostenibles** | La vivienda y el acceso a servicios básicos forman parte de las condiciones materiales del hogar. | Aporta evidencia para interpretar la relación entre entorno habitacional, servicios y bienestar alimentario. |
+| **ODS 2: Hambre Cero** | Es el objetivo principal, pues aborda la seguridad alimentaria, la nutrición y la identificación de hogares vulnerables. | Genera evidencia descriptiva sobre la prevalencia de inseguridad alimentaria y sus asociaciones con condiciones socioeconómicas. 
 
 
 ## 5. Arquitectura propuesta
@@ -332,11 +329,6 @@ Las consultas analíticas se implementaron en `src/analytics.py` y se documentar
 | `numero_estrategias` | Conteo de estrategias de afrontamiento activas en la combinación de la dimensión junk. |
 
 
-
-### Espacio para evidencia del dashboard
-
-`[ Espacio reservado para imagen: dashboard/dashboard_final.png ]`
-
 ## 9. Instrucciones de implementación
 
 ### Requisitos previos
@@ -441,11 +433,8 @@ El dashboard aún no ha sido construido. Esta sección se completará con la her
 | Método de ponderación | `SUM(FEX_C × PROB_IAMG) / SUM(FEX_C)` sobre hogares con dato válido. |
 | Comparación externa | El 21,10% reconcilia con el 21,1% publicado oficialmente por el DANE para 2025. |
 
-## 13. Main findings, limitaciones y supuestos
 
-<!-- Esta sección se deja intencionalmente en blanco hasta finalizar el ETL, el modelo dimensional, las consultas y el dashboard. -->
-
-## 14. Integrantes y responsabilidades
+## 13. Integrantes y responsabilidades
 
 | Integrante(s) | Responsabilidades |
 |---|---|
