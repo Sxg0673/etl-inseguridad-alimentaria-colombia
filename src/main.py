@@ -64,6 +64,8 @@ def main():
     cargar_modelo(modelo)
     validar_post_carga(modelo)
     ejecutar_analitica()
+    from export_results import main as exportar_resultados
+    exportar_resultados()
     print("\n✓ Pipeline ETL y analítica completados")
 
 

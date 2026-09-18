@@ -1,0 +1,5 @@
+﻿tiene_acueducto,tiene_alcantarillado,hogares,prevalencia_moderada_grave_pct,prevalencia_grave_pct
+True,True,42099,16.86,2.45
+True,False,22355,30.09,4.84
+False,True,1481,33.2,5.73
+False,False,20407,40.11,8.66

@@ -1,0 +1,7 @@
+﻿quintil_ingreso,hogares,prevalencia_moderada_grave_pct,prevalencia_grave_pct,nombre_quintil
+Q1,22265,40.91,8.63,Q1 - 20% de hogares con menor ingreso per capita
+Q2,20634,29.67,4.46,Q2
+Q3,17350,19.28,2.4,Q3
+Q4,14898,11.08,1.29,Q4
+Q5,11192,4.66,0.33,Q5 - 20% de hogares con mayor ingreso per capita
+Dato inconsistente,3,0.0,0.0,Dato inconsistente - excluido del analisis de ingreso
