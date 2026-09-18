@@ -139,14 +139,6 @@ El perfilamiento se ejecutó sobre los archivos completos y se documentó en [no
 | Valores extremos | Los 5 valores de `PERCAPITA` superiores a 50 millones cumplen la aritmética observada. | No eliminarlos automáticamente; documentar su tratamiento analítico. |
 | FIES | `PROB_IAMG` y `PROB_IAG` son nulas en 718 hogares, coincidiendo con respuestas “no sabe/no informa”. | Excluir esos hogares de las prevalencias FIES y documentar el denominador. |
 
-#### Resultados de validación de inseguridad alimentaria
-
-| Indicador | Resultado |
-|---|---:|
-| Prevalencia ponderada de inseguridad alimentaria moderada o grave | **21,10%** |
-| Prevalencia ponderada de inseguridad alimentaria grave | **3,42%** |
-| Método de ponderación | `SUM(FEX_C × PROB_IAMG) / SUM(FEX_C)` sobre hogares con dato válido. |
-| Comparación externa | El 21,10% reconcilia con el 21,1% publicado oficialmente por el DANE para 2025. |
 
 #### Consideraciones de interpretación
 
@@ -155,11 +147,59 @@ El perfilamiento se ejecutó sobre los archivos completos y se documentó en [no
 - `P3203S10` (“Disminuyeron el gasto en alimentos”) requiere una interpretación diferenciada por su cercanía conceptual con la inseguridad alimentaria.
 - El diccionario documenta directamente solo una parte de las variables núcleo. Para decodificar categorías se combinarán los dominios, las descripciones de variables y la tabla DIVIPOLA.
 
-(Colocar acá la parte del clean)
+### 6.4 Limpieza
+
+La limpieza se implementó en `src/clean.py` y se ejecuta antes de la transformación. Sus decisiones se basan directamente en los hallazgos del perfilamiento:
+
+| Tabla | Operación aplicada | Justificación |
+|---|---|---|
+| Vivienda | Eliminación de `P8520`, `P4065`, `P5661` y `P3157`. | Son columnas contenedoras 100% vacías; la información se encuentra en sus subítems. |
+| Vivienda | Normalización de `P1_DEPARTAMENTO` mediante `zfill(2)`. | Alinea los códigos con el estándar DIVIPOLA antes del cruce geográfico. |
+| Servicios del hogar | Eliminación de `P1892`, `P5046S1`, `P5012`, `P3169`, `P3172` y `P3174`. | Son columnas contenedoras sin datos observados. |
+| Servicios del hogar | Creación de `ingreso_percapita_inconsistente`. | Marca los 3 hogares con `PERCAPITA = 0` e `I_HOGAR > 0`, sin eliminar sus registros. |
+| Condiciones de vida | Eliminación de `P9025`, `P3180`, `P9005`, `P784`, `P1072`, `P1077`, `P795`, `P1913`, `P3202`, `P3203` y `P3516`. | Son encabezados de baterías; los valores analíticos se encuentran en las variables hijas. |
+
+#### Decisiones de limpieza
+
+- Los vacíos de las baterías de selección múltiple no se imputan: representan que una opción no fue marcada.
+- Los tres casos inconsistentes de ingreso se marcan para excluirlos únicamente del cálculo de quintiles; continúan disponibles para R1-R4.
+- No se recalcula `PERCAPITA`, porque el perfilamiento no permite afirmar que el DANE lo obtenga mediante una división simple del ingreso del hogar.
+- La limpieza no elimina hogares ni modifica las medidas FIES; prepara las tablas para que `transform.py` aplique las reglas de negocio.
+
+### 6.5 Transformación
+
+La transformación se implementó en `src/transform.py`. Integra las tres tablas, decodifica variables, deriva indicadores y conserva únicamente las columnas de negocio necesarias para los cinco requerimientos.
+
+| Etapa | Decisión implementada | Resultado |
+|---|---|---|
+| Selección e integración | Se conservan únicamente las variables de vivienda, servicios, choques, estrategias, FIES y factores de expansión. | Una tabla integrada a nivel de hogar. |
+| Llaves de integración | Condiciones y servicios por (`DIRECTORIO`, `ORDEN`); el resultado se une con vivienda por `DIRECTORIO`. | Se mantiene el grano de un hogar por fila. |
+| Decodificación geográfica | Región y clase se obtienen del diccionario DANE; el departamento se obtiene de DIVIPOLA. | Se agregan `nombre_region`, `nombre_clase` y `nombre_departamento`. |
+| Servicios públicos | `1` se transforma en `True` y `2` en `False` para acueducto y alcantarillado. | `tiene_acueducto` y `tiene_alcantarillado`. |
+| Choques económicos | Se convierten 11 subítems en banderas booleanas; se excluye `P3202S12` porque representa “Ninguno de los anteriores”. | Indicadores `choque_*` para R3. |
+| Estrategias de afrontamiento | Se convierten los 14 subítems en banderas booleanas. | Indicadores `estrategia_*` para R4. |
+| Severidad FIES | Se calcula un puntaje crudo de 0 a 8 y se clasifica en seguridad, inseguridad leve, moderada, grave o sin dato. | `nivel_severidad_ia`. |
+| Ingreso | Se calculan quintiles sobre la población expandida mediante `FEX_C`; los inconsistentes se clasifican aparte. | `quintil_ingreso`. |
+| Medidas numéricas | Se convierten las cifras con coma decimal del DANE a valores numéricos. | `factor_expansion`, `prob_ia_moderada_grave` y `prob_ia_grave`. |
+| Trazabilidad | Se conservan `DIRECTORIO` y `ORDEN` como llaves naturales. | Permite regresar al registro original del DANE. |
+
+### 6.6 Carga
+
+La carga se implementó en `src/load.py` para PostgreSQL. El proceso crea la base de datos si no existe, ejecuta el DDL, reinicia las tablas del modelo y carga las dimensiones antes del hecho.
+
+| Decisión de carga | Implementación |
+|---|---|
+| Motor de destino | PostgreSQL mediante `psycopg2-binary`. |
+| Definición física | `sql/create_tables.sql`. |
+| Orden | `dim_geografia`, `dim_nivel_ingreso`, `dim_nivel_severidad_ia`, `dim_choque_economico`, `dim_estrategia_afrontamiento` y finalmente `fact_seguridad_alimentaria_hogar`. |
+| Repetibilidad | Se ejecuta `TRUNCATE ... CASCADE` antes de una nueva carga completa. |
+| Inserción | Carga por lotes con `execute_values`. |
+| Nulos | Los valores nulos de pandas se convierten en `NULL` de PostgreSQL. |
+| Consistencia | La carga se ejecuta dentro de una transacción; ante un error se revierten los cambios. |
 
 ## 7. Modelamiento dimensional
 
-El modelo dimensional se documentará mediante las siguientes fases. A la fecha, se cuenta con los requerimientos y la declaración preliminar del grano; las dimensiones, los hechos y el diagrama se encuentran pendientes de definición formal.
+El modelo dimensional implementado corresponde a un esquema estrella. La especificación fuente se encuentra en [diagrams/star_schema.dbml](diagrams/star_schema.dbml) y su representación editable de dbdiagram.io en [diagrams/star_schema.dbdiagram](diagrams/star_schema.dbdiagram).
 
 ### 7.1 Requerimientos
 
@@ -180,45 +220,118 @@ Este grano debe validarse antes de la carga para evitar duplicaciones, agregacio
 
 ### 7.3 Dimensiones
 
-| Dimensión candidata | Propósito | Atributos candidatos | Clave sustituta | Estado |
-|---|---|---|---|---|
-|  |  |  |  | Pendiente |
-|  |  |  |  | Pendiente |
-|  |  |  |  | Pendiente |
+| Dimensión | Grano | Propósito | Atributos principales | Tamaño observado | Clave sustituta |
+|---|---|---|---|---|---|
+| `dim_geografia` | Una combinación de departamento y clase de área. | Responder R1 y segmentar territorialmente el hogar. | Código y nombre de departamento, región y clase. | 65 filas | `id_geografia` |
+| `dim_nivel_ingreso` | Un quintil de ingreso per cápita o la categoría de inconsistencia. | Responder R5 y ordenar el gradiente de ingreso. | `codigo_quintil`, `nombre_quintil`. | 6 filas | `id_nivel_ingreso` |
+| `dim_nivel_severidad_ia` | Un nivel de severidad FIES. | Clasificar la situación alimentaria del hogar. | Nombre de severidad y límites del puntaje FIES. | 5 filas | `id_nivel_severidad_ia` |
+| `dim_choque_economico` | Una combinación de choques económicos realmente observada. | Responder R3 sin crear combinaciones teóricas inexistentes. | 11 banderas booleanas y `numero_choques`. | 172 filas | `id_choque_economico` |
+| `dim_estrategia_afrontamiento` | Una combinación de estrategias realmente observada. | Responder R4 y conservar la combinación de respuestas del hogar. | 14 banderas booleanas y `numero_estrategias`. | 265 filas | `id_estrategia_afrontamiento` |
+
+Las dimensiones de choques y estrategias son **junk dimensions**: agrupan varias banderas de baja cardinalidad en una fila identificable por una clave sustituta. Solo se materializan combinaciones observadas en los datos, evitando el producto cartesiano completo.
 
 ### 7.4 Facts
 
-| Tabla de hechos candidata | Grano | Medidas | Claves foráneas | Estado |
+| Tabla de hechos | Grano | Medidas | Claves foráneas | Llaves naturales conservadas |
 |---|---|---|---|---|
-|  |  |  |  | Pendiente |
+| `fact_seguridad_alimentaria_hogar` | Una fila por hogar encuestado en la ECV 2025. | `factor_expansion`, `prob_ia_moderada_grave`, `prob_ia_grave`, `tiene_acueducto`, `tiene_alcantarillado`. | `id_geografia`, `id_nivel_ingreso`, `id_nivel_severidad_ia`, `id_choque_economico`, `id_estrategia_afrontamiento`. | `directorio`, `orden`; además `id_hogar` como clave sustituta del hecho. |
+
+El hecho contiene 87.060 filas y 13 columnas. Las medidas de prevalencia deben calcularse ponderando por `factor_expansion`. Las probabilidades FIES pueden ser nulas únicamente para los 718 hogares clasificados como `Sin dato`.
 
 ### 7.5 Estrategia de claves sustitutas
 
-| Elemento | Decisión de diseño | Estado |
+| Elemento | Decisión de diseño | Justificación / evidencia |
 |---|---|---|
-| Generación de claves sustitutas |  | Pendiente |
-| Retención de llaves naturales DANE | Conservar (`DIRECTORIO`, `ORDEN`) para trazabilidad, aunque no sustituyan la clave dimensional. | Por confirmar |
-| Manejo de registros desconocidos |  | Pendiente |
-| Integridad referencial |  | Pendiente |
-| Historización de dimensiones | La ECV 2025 es transversal; la necesidad de SCD deberá justificarse si se incorporan nuevas rondas. | Por confirmar |
+| Generación | Claves enteras secuenciales desde 1, generadas al construir cada dimensión y el hecho. | Implementado en `dimensional_model.py` mediante `range(1, len(dim) + 1)`. |
+| Dimensiones | Cada dimensión tiene una clave sustituta propia: `id_geografia`, `id_nivel_ingreso`, `id_nivel_severidad_ia`, `id_choque_economico` e `id_estrategia_afrontamiento`. | Permite que el hecho referencie categorías sin depender de códigos o combinaciones naturales. |
+| Hecho | `id_hogar` identifica de forma única cada fila del hecho. | El validador comprueba que no existan duplicados. |
+| Retención de llaves naturales | Se conservan `directorio` y `orden` en el hecho. | Mantienen trazabilidad al registro original y tienen una restricción `UNIQUE (directorio, orden)`. |
+| Manejo de desconocidos | No se agrega una fila desconocida artificial. Los dominios y las relaciones deben quedar completos antes de la carga. | La validación verifica llaves no nulas y sin duplicados. |
+| Integridad referencial | Todas las claves foráneas del hecho apuntan a sus dimensiones. | Está definido en `sql/create_tables.sql` y la carga respeta el orden dimensión → hecho. |
+| Historización | No se implementa SCD en esta fase. | La ECV 2025 es transversal; se revisará si se incorporan nuevas rondas. |
 
 ### 7.6 Diagrama dimensional
 
-> **Pendiente:** insertar aquí el diagrama final con dimensiones, tabla(s) de hechos, cardinalidades y claves.
+El diagrama representa el hecho central y sus cinco dimensiones relacionadas mediante claves foráneas. La fuente editable está en [star_schema.dbml](diagrams/star_schema.dbml); el archivo [star_schema.dbdiagram](diagrams/star_schema.dbdiagram) conserva la distribución visual del esquema.
 
-`[ Espacio reservado para imagen: diagrams/modelo_dimensional.png ]`
+```mermaid
+erDiagram
+  FACT_SEGURIDAD_ALIMENTARIA_HOGAR }o--|| DIM_GEOGRAFIA : "id_geografia"
+  FACT_SEGURIDAD_ALIMENTARIA_HOGAR }o--|| DIM_NIVEL_INGRESO : "id_nivel_ingreso"
+  FACT_SEGURIDAD_ALIMENTARIA_HOGAR }o--|| DIM_NIVEL_SEVERIDAD_IA : "id_nivel_severidad_ia"
+  FACT_SEGURIDAD_ALIMENTARIA_HOGAR }o--|| DIM_CHOQUE_ECONOMICO : "id_choque_economico"
+  FACT_SEGURIDAD_ALIMENTARIA_HOGAR }o--|| DIM_ESTRATEGIA_AFRONTAMIENTO : "id_estrategia_afrontamiento"
+
+  FACT_SEGURIDAD_ALIMENTARIA_HOGAR {
+    int id_hogar PK
+    int id_geografia FK
+    int id_nivel_ingreso FK
+    int id_nivel_severidad_ia FK
+    int id_choque_economico FK
+    int id_estrategia_afrontamiento FK
+    boolean tiene_acueducto
+    boolean tiene_alcantarillado
+    decimal factor_expansion
+    decimal prob_ia_moderada_grave
+    decimal prob_ia_grave
+  }
+  DIM_GEOGRAFIA {
+    int id_geografia PK
+    varchar codigo_departamento
+    varchar nombre_departamento
+    varchar codigo_region
+    varchar nombre_region
+    varchar codigo_clase
+    varchar nombre_clase
+  }
+  DIM_NIVEL_INGRESO {
+    int id_nivel_ingreso PK
+    varchar codigo_quintil
+    varchar nombre_quintil
+  }
+  DIM_NIVEL_SEVERIDAD_IA {
+    int id_nivel_severidad_ia PK
+    varchar nombre_severidad
+    int puntaje_fies_minimo
+    int puntaje_fies_maximo
+  }
+  DIM_CHOQUE_ECONOMICO {
+    int id_choque_economico PK
+    boolean banderas_choques
+    int numero_choques
+  }
+  DIM_ESTRATEGIA_AFRONTAMIENTO {
+    int id_estrategia_afrontamiento PK
+    boolean banderas_estrategias
+    int numero_estrategias
+  }
+```
+
 
 ## 8. Consultas analíticas y KPIs
 
-Las consultas y los KPIs todavía no han sido implementados. La siguiente tabla organiza el trabajo pendiente sin asumir un modelo dimensional que aún no ha sido aprobado.
+Las consultas analíticas se implementaron en `src/analytics.py` y se documentaron en [sql/analytical_queries.sql](sql/analytical_queries.sql). El módulo ejecuta una consulta para cada requerimiento R1-R5 sobre el modelo estrella ya cargado. Las prevalencias de inseguridad alimentaria se calculan de forma ponderada mediante `factor_expansion`, y se excluyen del denominador los hogares cuyo valor de `prob_ia_moderada_grave` es nulo.
 
-| Requerimiento | Pregunta analítica | Dimensiones requeridas | Medidas / indicadores | Consulta o KPI final |
+| Requerimiento | Pregunta analítica | Dimensiones requeridas | Medidas / indicadores | KPI final |
 |---|---|---|---|---|
-| R1 | ¿Cómo se distribuye la inseguridad alimentaria por región y departamento? |  |  |  |
-| R2 | ¿Qué relación se observa entre servicios públicos y vulnerabilidad alimentaria? |  |  |  |
-| R3 | ¿Cómo se relacionan los choques económicos con la inseguridad alimentaria? |  |  |  |
-| R4 | ¿Qué estrategias de afrontamiento se observan según la severidad? |  |  |  |
-| R5 | ¿Cómo cambia la vulnerabilidad alimentaria según el ingreso per cápita? |  |  |  |
+| R1 | ¿Cómo se distribuye la inseguridad alimentaria por región y departamento? | `dim_geografia` | `hogares`, `factor_expansion`, `prob_ia_moderada_grave`, `prob_ia_grave` | Prevalencia ponderada de inseguridad moderada o grave y prevalencia ponderada de inseguridad grave por región y departamento. |
+| R2 | ¿Qué relación se observa entre servicios públicos y vulnerabilidad alimentaria? | Ninguna dimensión adicional; utiliza atributos del hecho `tiene_acueducto` y `tiene_alcantarillado`. | `hogares`, `factor_expansion`, `prob_ia_moderada_grave`, `prob_ia_grave` | Prevalencia ponderada de inseguridad moderada o grave y grave según la combinación de acceso a acueducto y alcantarillado. |
+| R3 | ¿Cómo se relacionan los choques económicos con la inseguridad alimentaria? | `dim_choque_economico` | `numero_choques`, `hogares`, `factor_expansion`, `prob_ia_moderada_grave`, `prob_ia_grave` | Prevalencia ponderada de inseguridad moderada o grave y grave según el número de choques económicos reportados. |
+| R4 | ¿Qué estrategias de afrontamiento se observan según la severidad? | `dim_nivel_severidad_ia`, `dim_estrategia_afrontamiento` | `numero_estrategias`, `hogares`, `factor_expansion` | Distribución porcentual ponderada de hogares por nivel de severidad y número de estrategias de afrontamiento. |
+| R5 | ¿Cómo cambia la vulnerabilidad alimentaria según el ingreso per cápita? | `dim_nivel_ingreso` | `hogares`, `factor_expansion`, `prob_ia_moderada_grave`, `prob_ia_grave` | Prevalencia ponderada de inseguridad moderada o grave y grave por quintil de ingreso. |
+
+### Definición de las medidas
+
+| Medida | Definición |
+|---|---|
+| `hogares` | Conteo de registros del hecho incluidos en cada agrupación. No representa por sí solo una estimación poblacional. |
+| `factor_expansion` | Factor `FEX_C` utilizado para ponderar la muestra y aproximar la población nacional. |
+| `prob_ia_moderada_grave` | Probabilidad FIES de inseguridad alimentaria moderada o grave, expresada en escala de 0 a 100. |
+| `prob_ia_grave` | Probabilidad FIES de inseguridad alimentaria grave, expresada en escala de 0 a 100. |
+| `numero_choques` | Conteo de choques económicos activos en la combinación de la dimensión junk. |
+| `numero_estrategias` | Conteo de estrategias de afrontamiento activas en la combinación de la dimensión junk. |
+
+
 
 ### Espacio para evidencia del dashboard
 
@@ -267,29 +380,50 @@ Las dependencias corresponden al contenido actual de [requirements.txt](requirem
 
 ```text
 .
-├── README.md
-├── requirements.txt
-├── dashboard/                         # Espacio para el dashboard final
+├── README.md                              # Documentación académica del proyecto
+├── requirements.txt                       # Dependencias de Python
+├── .env.example                           # Plantilla de variables de entorno
+├── archify/
+│   └── arquitectura-etl.json              # Fuente estructurada de la arquitectura ETL
+├── dashboard/
+│   └── .gitkeep                            # Espacio reservado para el dashboard final
 ├── data/
-│   ├── raw/                           # CSV de la ECV descargados del DANE
-│   └── reference/                     # Diccionario y referencia DIVIPOLA
-├── diagrams/                          # Diagramas del problema y arquitectura
+│   ├── raw/                                # Archivos originales descargados del DANE
+│   │   ├── README.md                       # Instrucciones de adquisición y formato
+│   │   ├── Datos de la vivienda.csv
+│   │   ├── Servicios del hogar.csv
+│   │   └── Condiciones de vida del hogar y tenencia de bienes.csv
+│   ├── processed/
+│   │   └── datos_transformados.csv         # Salida de la etapa de transformación
+│   └── reference/                          # Fuentes auxiliares de decodificación
+│       ├── Plantilla_Diccionario_Datos.csv
+│       └── divipola_departamentos.csv
+├── diagrams/
+│   ├── contexto_problema.png               # Diagrama del contexto del problema
+│   ├── star_schema.dbml                    # Definición editable del esquema estrella
+│   ├── star_schema.dbdiagram               # Diseño visual del esquema estrella
+│   └── diagrama-proceso-ETL/
+│       ├── arquitectura-etl-inseguridad-alimentaria.html
+│       ├── arquitectura-etl-inseguridad-alimentaria.visual-check.html
+│       ├── arquitectura-etl-inseguridad-alimentaria.visual-check.json
+│       └── *.png                           # Capturas de validación visual
 ├── notebooks/
-│   ├── data_profiling.ipynb            # Exploración y perfilamiento
-│   └── hallazgos_perfilamiento.md      # Resultados verificados del perfilamiento
-├── results/                            # Resultados generados
+│   ├── data_profiling.ipynb                # Exploración y perfilamiento
+│   └── hallazgos_perfilamiento.md          # Hallazgos verificados
+├── results/                                # Espacio para resultados exportados
 ├── sql/
-│   ├── analytical_queries.sql          # Consultas analíticas, pendiente
-│   └── create_tables.sql               # DDL del modelo, pendiente
+│   ├── analytical_queries.sql              # Consultas analíticas R1-R5
+│   └── create_tables.sql                   # DDL de dimensiones y hecho
 └── src/
-    ├── analytics.py                   # Analítica, pendiente de completar
-    ├── clean.py                       # Limpieza, en desarrollo
-    ├── dimensional_model.py           # Modelo dimensional, pendiente
-    ├── extract.py                     # Lectura de archivos crudos
-    ├── load.py                        # Carga, pendiente de completar
-    ├── main.py                        # Punto de entrada previsto
-    ├── transform.py                   # Transformación, en desarrollo
-    └── validate.py                    # Validaciones, en desarrollo
+    ├── main.py                            # Orquestador del pipeline ETL y analítica
+    ├── config.py                          # Configuración de conexión a PostgreSQL
+    ├── extract.py                         # Extracción de archivos CSV
+    ├── clean.py                           # Limpieza de tablas fuente
+    ├── transform.py                       # Integración y derivación de variables
+    ├── dimensional_model.py                # Construcción del esquema estrella
+    ├── load.py                            # Creación y carga del almacén de datos
+    ├── validate.py                        # Validación pre-carga y post-carga
+    └── analytics.py                       # Ejecución de consultas R1-R5
 ```
 
 ## 12. Dashboard
@@ -297,6 +431,15 @@ Las dependencias corresponden al contenido actual de [requirements.txt](requirem
 El dashboard aún no ha sido construido. Esta sección se completará con la herramienta utilizada, las vistas implementadas, los filtros, los KPIs, la fecha de actualización y capturas de evidencia.
 
 `[ Espacio reservado para descripción y capturas del dashboard ]`
+
+#### Resultados de validación de inseguridad alimentaria
+
+| Indicador | Resultado |
+|---|---:|
+| Prevalencia ponderada de inseguridad alimentaria moderada o grave | **21,10%** |
+| Prevalencia ponderada de inseguridad alimentaria grave | **3,42%** |
+| Método de ponderación | `SUM(FEX_C × PROB_IAMG) / SUM(FEX_C)` sobre hogares con dato válido. |
+| Comparación externa | El 21,10% reconcilia con el 21,1% publicado oficialmente por el DANE para 2025. |
 
 ## 13. Main findings, limitaciones y supuestos
 

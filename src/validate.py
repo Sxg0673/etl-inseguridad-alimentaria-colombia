@@ -8,6 +8,23 @@ Modulo de validacion.
 5. Verifica que los nulos de prob_ia_moderada_grave coincidan exactamente, fila por fila,
 """
 
+import psycopg2
+
+from config import DB_CONFIG
+SEVERIDADES_ESPERADAS = {'Seguridad alimentaria', 'Inseguridad leve',
+                          'Inseguridad moderada', 'Inseguridad grave', 'Sin dato'}
+
+TABLAS_MODELO = [
+    'dim_geografia',
+    'dim_nivel_ingreso',
+    'dim_nivel_severidad_ia',
+    'dim_choque_economico',
+    'dim_estrategia_afrontamiento',
+    'fact_seguridad_alimentaria_hogar',
+]
+
+#Pre carga
+
 TOLERANCIA_RECONCILIACION_DANE = 0.1
 PREVALENCIA_OFICIAL_DANE = 21.1
 
@@ -247,3 +264,191 @@ def validar_pre_carga(modelo, df_transformado):
 
     print()
     print('Todas las validaciones pre-carga pasaron correctamente.')
+
+#Post carga
+
+def _registrar_resultado(resultados, nombre, cumple, detalle):
+    """Guarda y muestra un resultado de post-validacion."""
+    estado = 'PASS' if cumple else 'FAIL'
+    resultados.append(cumple)
+    print(f'[{estado}] {nombre}: {detalle}')
+
+
+def _validar_tablas_cargadas(cursor, modelo, resultados):
+    """Comprueba que existan las tablas esperadas y tengan el conteo cargado."""
+    for nombre_tabla in TABLAS_MODELO:
+        cursor.execute(
+            """
+            SELECT EXISTS (
+                SELECT 1
+                FROM information_schema.tables
+                WHERE table_schema = 'public' AND table_name = %s
+            )
+            """,
+            (nombre_tabla,),
+        )
+        existe = cursor.fetchone()[0]
+        _registrar_resultado(
+            resultados,
+            f'Tabla {nombre_tabla}',
+            existe,
+            'existe en public' if existe else 'no existe en public',
+        )
+
+        if not existe:
+            continue
+
+        cursor.execute(
+            f'SELECT COUNT(*) FROM public."{nombre_tabla}"'
+        )
+        actual = cursor.fetchone()[0]
+        esperado = len(modelo[nombre_tabla])
+        _registrar_resultado(
+            resultados,
+            f'Registros {nombre_tabla}',
+            actual == esperado,
+            f'{actual} cargados, {esperado} esperados',
+        )
+
+
+def _validar_claves_y_nulos(cursor, resultados):
+    """Comprueba claves primarias, llaves naturales y campos obligatorios."""
+    comprobaciones = [
+        (
+            'Claves primarias dimensiones',
+            """
+            SELECT COUNT(*) = 0
+            FROM (
+                SELECT id_geografia AS llave FROM dim_geografia
+                WHERE id_geografia IS NULL
+                UNION ALL SELECT id_nivel_ingreso FROM dim_nivel_ingreso
+                WHERE id_nivel_ingreso IS NULL
+                UNION ALL SELECT id_nivel_severidad_ia FROM dim_nivel_severidad_ia
+                WHERE id_nivel_severidad_ia IS NULL
+                UNION ALL SELECT id_choque_economico FROM dim_choque_economico
+                WHERE id_choque_economico IS NULL
+                UNION ALL SELECT id_estrategia_afrontamiento
+                FROM dim_estrategia_afrontamiento
+                WHERE id_estrategia_afrontamiento IS NULL
+            ) n
+            """,
+        ),
+        (
+            'Clave primaria del hecho',
+            'SELECT COUNT(*) = 0 FROM fact_seguridad_alimentaria_hogar '
+            'WHERE id_hogar IS NULL',
+        ),
+        (
+            'Llave natural del hecho',
+            """
+            SELECT COUNT(*) = COUNT(DISTINCT (directorio, orden))
+            FROM fact_seguridad_alimentaria_hogar
+            """,
+        ),
+        (
+            'Campos obligatorios del hecho',
+            """
+            SELECT COUNT(*) = 0
+            FROM fact_seguridad_alimentaria_hogar
+            WHERE directorio IS NULL OR orden IS NULL
+               OR id_geografia IS NULL OR id_nivel_ingreso IS NULL
+               OR id_nivel_severidad_ia IS NULL OR id_choque_economico IS NULL
+               OR id_estrategia_afrontamiento IS NULL
+               OR tiene_acueducto IS NULL OR tiene_alcantarillado IS NULL
+               OR factor_expansion IS NULL
+            """,
+        ),
+    ]
+
+    for nombre, consulta in comprobaciones:
+        cursor.execute(consulta)
+        cumple = cursor.fetchone()[0]
+        _registrar_resultado(
+            resultados,
+            nombre,
+            cumple,
+            'sin nulos ni duplicados' if cumple else 'se encontraron nulos o duplicados',
+        )
+
+
+def _validar_integridad_referencial(cursor, resultados):
+    """Comprueba que cada llave foranea del hecho apunte a una dimension."""
+    relaciones = [
+        ('geografia', 'id_geografia'),
+        ('nivel_ingreso', 'id_nivel_ingreso'),
+        ('nivel_severidad_ia', 'id_nivel_severidad_ia'),
+        ('choque_economico', 'id_choque_economico'),
+        ('estrategia_afrontamiento', 'id_estrategia_afrontamiento'),
+    ]
+
+    for sufijo, llave in relaciones:
+        tabla = f'dim_{sufijo}'
+        cursor.execute(
+            f"""
+            SELECT COUNT(*)
+            FROM fact_seguridad_alimentaria_hogar f
+            LEFT JOIN {tabla} d ON d.{llave} = f.{llave}
+            WHERE d.{llave} IS NULL
+            """
+        )
+        huerfanas = cursor.fetchone()[0]
+        _registrar_resultado(
+            resultados,
+            f'FK hacia {tabla}',
+            huerfanas == 0,
+            'sin registros huerfanos' if huerfanas == 0 else f'{huerfanas} huerfanos',
+        )
+
+
+def _validar_contenido_cargado(cursor, modelo, resultados):
+    """Comprueba que las claves cargadas coincidan con las generadas en memoria."""
+    comprobaciones = [
+        ('IDs geografia', 'dim_geografia', 'id_geografia'),
+        ('IDs nivel ingreso', 'dim_nivel_ingreso', 'id_nivel_ingreso'),
+        ('IDs severidad', 'dim_nivel_severidad_ia', 'id_nivel_severidad_ia'),
+        ('IDs choque', 'dim_choque_economico', 'id_choque_economico'),
+        ('IDs estrategia', 'dim_estrategia_afrontamiento', 'id_estrategia_afrontamiento'),
+        ('IDs hogar', 'fact_seguridad_alimentaria_hogar', 'id_hogar'),
+    ]
+
+    for nombre, tabla, columna in comprobaciones:
+        cursor.execute(f'SELECT MIN({columna}), MAX({columna}), COUNT(DISTINCT {columna}) FROM {tabla}')
+        minimo, maximo, distintos = cursor.fetchone()
+        serie = modelo[tabla][columna]
+        cumple = (
+            minimo == serie.min()
+            and maximo == serie.max()
+            and distintos == serie.nunique()
+        )
+        _registrar_resultado(
+            resultados,
+            nombre,
+            cumple,
+            f'rango BD {minimo}-{maximo}, esperado {serie.min()}-{serie.max()}',
+        )
+
+
+def validar_post_carga(modelo):
+    """Valida en PostgreSQL que la carga corresponda al modelo generado."""
+    resultados = []
+    print('\nPOST-VALIDACION DE LA CARGA')
+    print('-' * 70)
+
+    try:
+        with psycopg2.connect(**DB_CONFIG) as conexion:
+            with conexion.cursor() as cursor:
+                _validar_tablas_cargadas(cursor, modelo, resultados)
+                _validar_claves_y_nulos(cursor, resultados)
+                _validar_integridad_referencial(cursor, resultados)
+                _validar_contenido_cargado(cursor, modelo, resultados)
+    except psycopg2.Error as error:
+        raise RuntimeError(f'No fue posible ejecutar la post-validacion: {error}') from error
+
+    total = len(resultados)
+    aprobadas = sum(resultados)
+    print('-' * 70)
+    if aprobadas != total:
+        print(f'POST-VALIDACION FALLIDA: {aprobadas}/{total} comprobaciones aprobadas.')
+        raise ValueError('La carga no cumple todas las validaciones post-load.')
+
+    print(f'POST-VALIDACION APROBADA: {aprobadas}/{total} comprobaciones cumplidas.')
