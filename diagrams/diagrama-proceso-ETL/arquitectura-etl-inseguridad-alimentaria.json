@@ -8,11 +8,11 @@
     "repository": {"url": "https://github.com/Sxg0673/etl-inseguridad-alimentaria-colombia", "provider": "github", "link_mode": "web", "revision": "b58f07333e24fdb196b9473abf1fbfeceeeb5403"},
     "viewBox": [1280, 690],
     "views": [
-      {"id": "contexto", "label": "1. Contexto", "focus": ["dane", "users"], "note": "Partimos de la pregunta sobre los factores asociados a la inseguridad alimentaria en hogares colombianos."},
-      {"id": "datos", "label": "2. Datos", "focus": ["dane", "raw"], "note": "La ECV 2025 del DANE aporta tres archivos CSV a nivel de vivienda y hogar."},
-      {"id": "preparacion", "label": "3. Preparación", "focus": ["raw", "orchestrator", "transform", "divipola"], "note": "main.py coordina la extracción, limpieza y transformación; DIVIPOLA completa la geografía."},
-      {"id": "modelo", "label": "4. Modelo", "focus": ["transform", "model", "postgres"], "note": "Cada fila final representa un hogar ECV 2025 y se carga en el esquema estrella de PostgreSQL."},
-      {"id": "resultados", "label": "5. Resultados", "focus": ["postgres", "analytics", "powerbi", "users"], "note": "Las consultas R1–R5 se convierten en informes que ayudan a comprender brechas entre hogares."}
+      {"id": "contexto", "label": "1. Contexto", "focus": ["dane", "users"], "note": "Presentamos el problema, la fuente ECV 2025 y la pregunta guía del caso de estudio."},
+      {"id": "recoleccion", "label": "2. Recolección", "focus": ["dane", "users"], "note": "Identificamos los actores que producen, usan o se benefician de los resultados del análisis."},
+      {"id": "extraccion", "label": "3. Extracción", "focus": ["dane", "raw", "orchestrator"], "note": "Leemos los tres CSV oficiales sin aplicar reglas de negocio ni modificar sus códigos."},
+      {"id": "transformacion", "label": "4. Transformación", "focus": ["orchestrator", "transform", "divipola", "model"], "note": "Integramos tablas, limpiamos datos y derivamos variables listas para el modelo dimensional."},
+      {"id": "carga", "label": "5. Carga", "focus": ["model", "postgres", "analytics", "powerbi", "users"], "note": "Cargamos dimensiones y hecho en PostgreSQL para consultarlos y visualizarlos en Power BI."}
     ]
   },
   "components": [
@@ -44,10 +44,10 @@
     {"id": "inform", "from": "powerbi", "to": "users", "label": "apoya decisiones", "labelAt": [478, 535]}
   ],
   "cards": [
-    {"dot": "rose", "title": "1. Pregunta guía y ODS 2", "items": ["¿Qué factores socioeconómicos, territoriales y de condiciones de vida están asociados con una mayor prevalencia de inseguridad alimentaria en los hogares colombianos?", "ODS 2: Hambre Cero busca poner fin al hambre, lograr la seguridad alimentaria, mejorar la nutrición y promover la agricultura sostenible.", "Su meta es un mundo libre de hambre y malnutrición para 2030. Referencia visual: diagrams/contexto_problema.png."]},
-    {"dot": "cyan", "title": "2–3. De los datos a la preparación", "items": ["La ECV 2025 aporta tres CSV: vivienda, servicios del hogar y condiciones de vida.", "main.py coordina la extracción, limpieza, transformación, modelo, carga y analítica.", "La transformación conserva una fila por hogar y agrega geografía, servicios, choques, estrategias, FIES e ingreso."]},
-    {"dot": "violet", "title": "4. Esquema estrella", "items": ["Granularidad: una fila de la tabla de hechos representa un hogar encuestado en la ECV 2025.", "DIRECTORIO y ORDEN conservan el vínculo con el registro original.", "El hecho se relaciona con geografía, ingreso, severidad, choques y estrategias. Referencia: diagrams/fact_table.jpg."]},
-    {"dot": "emerald", "title": "5. Preguntas que respondemos", "items": ["R1. ¿Cómo se distribuye la inseguridad alimentaria por región y departamento?", "R2. ¿Qué relación se observa entre servicios públicos y vulnerabilidad alimentaria?", "R3. ¿Cómo se relacionan los choques económicos con la inseguridad alimentaria?", "R4. ¿Qué estrategias de afrontamiento se observan según la severidad?", "R5. ¿Cómo cambia la vulnerabilidad alimentaria según el ingreso per cápita?"]},
-    {"dot": "amber", "title": "¿Para qué sirve?", "items": ["Power BI comunica los resultados para DANE, entidades sociales, gobiernos locales, organizaciones, academia y ciudadanía.", "Sirve para reconocer brechas territoriales y condiciones asociadas a la inseguridad alimentaria.", "Durante la exposición: seleccione las vistas 1–5 o una etapa para seguir la historia."]}
+    {"dot": "rose", "title": "1. Contexto", "items": ["La ECV 2025 del DANE ofrece información socioeconómica y territorial a nivel de hogar, con cobertura nacional.", "Permite estudiar condiciones de vida y medidas de inseguridad alimentaria derivadas de la escala FIES.", "Pregunta guía: ¿Qué factores socioeconómicos, territoriales y de condiciones de vida están asociados con una mayor prevalencia de inseguridad alimentaria en los hogares colombianos?"]},
+    {"dot": "cyan", "title": "2. Recolección de datos", "items": ["Los resultados sirven para DANE, entidades de política social, gobiernos locales, organizaciones, academia y ciudadanía.", "Cada actor puede usar el análisis para comprender la problemática, priorizar acciones o ampliar el estudio.", "La tabla inferior resume el interés y uso potencial de cada stakeholder."]},
+    {"dot": "orange", "title": "3. Extracción", "items": ["Leemos tres archivos CSV oficiales: vivienda, servicios del hogar y condiciones de vida.", "Se usa separador punto y coma, codificación utf-8-sig y todas las columnas se leen como texto.", "No aplicamos reglas de negocio en esta etapa; preservamos los datos y códigos originales."]},
+    {"dot": "emerald", "title": "4. Transformación", "items": ["Limpiamos campos vacíos, integramos las tablas y conservamos una fila por hogar.", "Usamos DIVIPOLA para nombres territoriales y derivamos servicios, choques, estrategias, severidad FIES y quintil de ingreso.", "DIRECTORIO y ORDEN se conservan para regresar al registro original."]},
+    {"dot": "violet", "title": "5. Carga", "items": ["Construimos un esquema estrella: una fila de hechos representa un hogar encuestado en la ECV 2025.", "Cargamos primero cinco dimensiones y luego la tabla de hechos en PostgreSQL.", "La carga se realiza por lotes y dentro de una transacción para mantener consistencia."]}
   ]
 }
