@@ -1,0 +1,209 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Arquitectura ETL: inseguridad alimentaria en hogares colombianos",
+    "quality_profile": "showcase",
+    "repository": {
+      "url": "https://github.com/Sxg0673/etl-inseguridad-alimentaria-colombia",
+      "provider": "github",
+      "link_mode": "web",
+      "revision": "b58f07333e24fdb196b9473abf1fbfeceeeb5403"
+    },
+    "viewBox": [1240, 680],
+    "views": [
+      {
+        "id": "flujo-principal",
+        "label": "Flujo ETL principal",
+        "focus": ["dane", "raw", "orchestrator", "clean", "transform", "model", "postgres"],
+        "note": "Desde los microdatos oficiales hasta el almacén dimensional a nivel de hogar."
+      },
+      {
+        "id": "modelo-analitico",
+        "label": "Modelo y análisis",
+        "focus": ["transform", "model", "postgres", "analytics", "powerbi"],
+        "note": "El esquema estrella habilita los KPIs ponderados y los informes."
+      },
+      {
+        "id": "limites-confianza",
+        "label": "Límites y dependencias",
+        "focus": ["dane", "divipola", "raw", "postgres", "powerbi", "stakeholders"],
+        "note": "DANE y DIVIPOLA son fuentes externas; PostgreSQL es el destino planeado localmente."
+      }
+    ]
+  },
+  "components": [
+    {
+      "id": "dane",
+      "type": "external",
+      "label": "Portal de microdatos DANE",
+      "sublabel": "ECV 2025 · catálogo 905",
+      "tag": "Fuente oficial",
+      "pos": [40, 210],
+      "size": [165, 72],
+      "sources": [{ "path": "README.md", "label": "Fuente ECV" }]
+    },
+    {
+      "id": "raw",
+      "type": "cloud",
+      "label": "Datos crudos CSV",
+      "sublabel": "3 tablas ECV; UTF-8-SIG; ;",
+      "tag": "data/raw/",
+      "pos": [260, 210],
+      "size": [160, 72],
+      "sources": [{ "path": "data/raw/README.md", "label": "Adquisición" }]
+    },
+    {
+      "id": "orchestrator",
+      "type": "backend",
+      "label": "Orquestador ETL",
+      "sublabel": "src/main.py",
+      "tag": "Punto de entrada",
+      "pos": [480, 210],
+      "size": [155, 72],
+      "sources": [{ "path": "src/main.py", "label": "Pipeline" }]
+    },
+    {
+      "id": "clean",
+      "type": "backend",
+      "label": "Limpieza y calidad",
+      "sublabel": "src/clean.py + validate.py",
+      "tag": "Conserva el grano",
+      "pos": [695, 210],
+      "size": [165, 72],
+      "sources": [{ "path": "src/clean.py", "label": "Limpieza" }, { "path": "src/validate.py", "label": "Validación" }]
+    },
+    {
+      "id": "divipola",
+      "type": "external",
+      "label": "Referencia DIVIPOLA",
+      "sublabel": "Departamentos y regiones",
+      "tag": "Dependencia externa",
+      "pos": [920, 45],
+      "size": [165, 68],
+      "sources": [{ "path": "data/reference/divipola_departamentos.csv", "label": "Referencia" }]
+    },
+    {
+      "id": "transform",
+      "type": "backend",
+      "label": "Transformación de negocio",
+      "sublabel": "src/transform.py",
+      "tag": "FIES · servicios · ingresos",
+      "pos": [920, 210],
+      "size": [180, 72],
+      "sources": [{ "path": "src/transform.py", "label": "Reglas" }]
+    },
+    {
+      "id": "model",
+      "type": "backend",
+      "label": "Modelo dimensional",
+      "sublabel": "Esquema estrella por hogar",
+      "tag": "5 dimensiones + hecho",
+      "pos": [920, 410],
+      "size": [175, 72],
+      "sources": [{ "path": "src/dimensional_model.py", "label": "Modelo" }, { "path": "diagrams/star_schema.dbml", "label": "Esquema" }]
+    },
+    {
+      "id": "postgres",
+      "type": "database",
+      "label": "PostgreSQL",
+      "sublabel": "Almacén dimensional",
+      "tag": "Destino planeado local",
+      "pos": [680, 410],
+      "size": [165, 72],
+      "sources": [{ "path": "src/load.py", "label": "Carga" }, { "path": "sql/create_tables.sql", "label": "DDL" }]
+    },
+    {
+      "id": "analytics",
+      "type": "backend",
+      "label": "Consultas analíticas",
+      "sublabel": "R1–R5 · KPIs ponderados",
+      "tag": "src/analytics.py",
+      "pos": [440, 410],
+      "size": [170, 72],
+      "sources": [{ "path": "src/analytics.py", "label": "KPIs" }, { "path": "sql/analytical_queries.sql", "label": "SQL" }]
+    },
+    {
+      "id": "powerbi",
+      "type": "frontend",
+      "label": "Power BI",
+      "sublabel": "Visualizaciones e informes",
+      "tag": "Integración en curso",
+      "pos": [210, 410],
+      "size": [170, 72],
+      "size": [155, 72],
+      "sources": [{ "path": "README.md", "label": "Dashboard" }]
+    },
+    {
+      "id": "stakeholders",
+      "type": "external",
+      "label": "Decisores y sociedad",
+      "sublabel": "Usuarios finales",
+      "tag": "Consumidores",
+      "pos": [210, 560],
+      "size": [170, 72],
+      "sources": [{ "path": "README.md", "label": "Stakeholders" }]
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "security-group",
+      "label": "Límite de confianza: fuentes oficiales externas",
+      "wraps": ["dane", "divipola"],
+      "pad": 30
+    },
+    {
+      "kind": "region",
+      "label": "Propiedad del proyecto: procesamiento ETL reproducible",
+      "wraps": ["raw", "orchestrator", "clean", "transform", "model"],
+      "pad": 28
+    },
+    {
+      "kind": "security-group",
+      "label": "Límite de confianza: destino de datos y consumo analítico",
+      "wraps": ["postgres", "analytics", "powerbi"],
+      "pad": 28
+    }
+  ],
+  "connections": [
+    { "id": "download", "from": "dane", "to": "raw", "label": "descarga de microdatos", "variant": "emphasis", "labelAt": [230, 305] },
+    { "id": "invoke", "from": "raw", "to": "orchestrator", "label": "lectura CSV", "variant": "emphasis", "labelAt": [450, 305] },
+    { "id": "clean-data", "from": "orchestrator", "to": "clean", "label": "ejecuta limpieza", "variant": "emphasis", "labelAt": [665, 305] },
+    { "id": "transform-data", "from": "clean", "to": "transform", "label": "tablas depuradas", "variant": "emphasis", "labelAt": [890, 305] },
+    { "id": "geocode", "from": "divipola", "to": "transform", "label": "cruce territorial", "variant": "dashed", "fromSide": "bottom", "toSide": "top", "labelAt": [1105, 180] },
+    { "id": "build-star", "from": "transform", "to": "model", "label": "hogar integrado", "variant": "emphasis", "fromSide": "bottom", "toSide": "top", "labelAt": [1115, 350] },
+    { "id": "load-warehouse", "from": "model", "to": "postgres", "label": "carga dimensiones → hecho", "variant": "emphasis", "fromSide": "left", "toSide": "right", "labelAt": [880, 390] },
+    { "id": "query-kpis", "from": "postgres", "to": "analytics", "label": "SQL R1–R5", "variant": "emphasis", "fromSide": "left", "toSide": "right", "labelAt": [645, 505] },
+    { "id": "publish-reports", "from": "analytics", "to": "powerbi", "label": "KPIs y conjuntos analíticos", "variant": "emphasis", "fromSide": "left", "toSide": "right", "labelAt": [410, 505] },
+    { "id": "decision-use", "from": "powerbi", "to": "stakeholders", "label": "informes para decisión", "variant": "default", "fromSide": "bottom", "toSide": "top", "labelAt": [405, 530] }
+  ],
+  "cards": [
+    {
+      "dot": "rose",
+      "title": "Contexto del problema",
+      "items": [
+        "Pregunta guía: factores socioeconómicos, territoriales y de vida asociados a la inseguridad alimentaria.",
+        "ECV 2025 observa hogares colombianos; el análisis apoya ODS 1, 2, 10 y 11.",
+        "Contexto visual de apoyo: diagrams/contexto_problema.png."
+      ]
+    },
+    {
+      "dot": "violet",
+      "title": "Esquema estrella y tabla de hechos",
+      "items": [
+        "fact_seguridad_alimentaria_hogar: un hogar ECV 2025 por fila (DIRECTORIO, ORDEN).",
+        "Dimensiones: geografía, ingreso, severidad FIES, choques y estrategias de afrontamiento.",
+        "Referencia visual: diagrams/fact_table.jpg; fuente editable: diagrams/star_schema.dbml."
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "Estado actual y controles",
+      "items": [
+        "PostgreSQL todavía no está instanciado en este equipo: el destino se representa como integración objetivo.",
+        "La carga es transaccional, por lotes y reinicia tablas antes de una carga completa.",
+        "Las prevalencias FIES se ponderan con factor_expansion; 718 hogares sin dato quedan fuera del denominador."
+      ]
+    }
+  ]
+}

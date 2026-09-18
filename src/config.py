@@ -1,8 +1,8 @@
 DB_CONFIG = {
     "host": "localhost",
     "user": "postgres",
-    "port": 5432, 
-    "password": "julian",
+    "port": "colocar el puerto de la base de datos", 
+    "password": "colocar la contraseña de la base de datos",
     "database": "inseguridad_alimentaria",
 }
 
